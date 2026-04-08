@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compressor de Imagem</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0e0e0f;
+      --surface: #18181b;
+      --surface2: #222226;
+      --border: rgba(255,255,255,0.08);
+      --border-hover: rgba(255,255,255,0.18);
+      --accent: #d4f23d;
+      --accent-dim: rgba(212,242,61,0.12);
+      --text: #f0f0ee;
+      --muted: #777775;
+      --muted2: #555553;
+      --danger: #f05a5a;
+      --success: #d4f23d;
+      --mono: 'DM Mono', monospace;
+      --sans: 'DM Sans', sans-serif;
+      --radius: 12px;
+      --radius-sm: 7px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 2rem 2.5rem 1.5rem;
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .logo-sub {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    main {
+      flex: 1;
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+    }
+
+    /* Drop Zone */
+    #drop-zone {
+      border: 1.5px dashed var(--border-hover);
+      border-radius: var(--radius);
+      padding: 3.5rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--surface);
+      position: relative;
+    }
+
+    #drop-zone:hover, #drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(212,242,61,0.04);
+    }
+
+    .drop-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 1.25rem;
+      background: var(--surface2);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .drop-icon svg {
+      width: 22px;
+      height: 22px;
+      stroke: var(--muted);
+    }
+
+    #drop-zone h2 {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    #drop-zone p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+
+    .btn-select {
+      display: inline-block;
+      font-size: 13px;
+      font-family: var(--mono);
+      font-weight: 500;
+      padding: 8px 20px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-hover);
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .btn-select:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Paste hint */
+    .paste-hint {
+      margin-top: 1rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted2);
+      font-family: var(--mono);
+    }
+
+    kbd {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 2px 6px;
+      border: 1px solid var(--muted2);
+      border-radius: 4px;
+      color: var(--muted);
+    }
+
+    /* Workspace */
+    #workspace {
+      display: none;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* File info bar */
+    .file-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+    }
+
+    .file-name {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 300px;
+    }
+
+    .btn-ghost {
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-ghost:hover { color: var(--text); border-color: var(--border-hover); }
+
+    /* Preview grid */
+    .preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .preview-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .preview-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      padding: 10px 14px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .preview-img-wrap {
+      aspect-ratio: 4/3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111;
+      overflow: hidden;
+    }
+
+    .preview-img-wrap img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .preview-meta {
+      padding: 10px 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* Controls */
+    .controls-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+    }
+
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .control-label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .control-value {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent);
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--surface2);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+    .fmt-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .fmt-btn {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      user-select: none;
+    }
+
+    .fmt-btn.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Result section */
+    #result-section {
+      display: none;
+      animation: fadeUp 0.3s ease;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .result-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .result-title {
+      font-size: 13px;
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .badge-saving {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 99px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid rgba(212,242,61,0.3);
+    }
+
+    .badge-saving.negative {
+      background: rgba(240,90,90,0.1);
+      color: var(--danger);
+      border-color: rgba(240,90,90,0.3);
+    }
+
+    .result-body {
+      padding: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+    }
+
+    .size-block {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .size-label {
+      font-size: 11px;
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted2);
+    }
+
+    .size-value {
+      font-family: var(--mono);
+      font-size: 26px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .size-arrow {
+      font-size: 20px;
+      color: var(--muted2);
+    }
+
+    .btn-download {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 12px 24px;
+      background: var(--accent);
+      color: #0e0e0f;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-download:hover {
+      background: #c8e832;
+      transform: translateY(-1px);
+    }
+
+    .btn-download:active { transform: translateY(0); }
+
+    .btn-download svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    /* Progress bar */
+    .progress-bar-wrap {
+      height: 2px;
+      background: var(--surface2);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.3s ease;
+      border-radius: 1px;
+    }
+
+    /* Dimensions */
+    .dim-info {
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--muted2);
+      padding: 0 14px 10px;
+    }
+
+    @media (max-width: 520px) {
+      header { padding: 1.25rem 1.25rem 1rem; }
+      main { padding: 1.5rem 1rem 3rem; }
+      .preview-grid { grid-template-columns: 1fr; }
+      .result-body { flex-direction: column; align-items: flex-start; }
+      .btn-download { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">imgzip</span>
+  <span class="logo-sub">/ compressor de imagens</span>
+</header>
+
+<main>
+  <!-- Drop zone -->
+  <div id="drop-zone">
+    <div class="drop-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="3"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+    </div>
+    <h2>Arraste uma imagem aqui</h2>
+    <p>PNG ou JPG — até 20 MB</p>
+    <label>
+      <span class="btn-select">Selecionar arquivo</span>
+      <input type="file" id="file-input" accept="image/png,image/jpeg" style="display:none">
+    </label>
+    <div>
+      <span class="paste-hint"><kbd>Ctrl</kbd>+<kbd>V</kbd> para colar da área de transferência</span>
+    </div>
+  </div>
+
+  <!-- Workspace -->
+  <div id="workspace">
+    <!-- File bar -->
+    <div class="file-bar">
+      <span class="file-name" id="file-name">arquivo.jpg</span>
+      <button class="btn-ghost" id="btn-reset">Trocar</button>
+    </div>
+
+    <!-- Previews -->
+    <div class="preview-grid">
+      <div class="preview-card">
+        <div class="preview-label">Original</div>
+        <div class="preview-img-wrap"><img id="prev-orig" alt="original"></div>
+        <div class="preview-meta" id="meta-orig">—</div>
+        <div class="dim-info" id="dim-orig"></div>
+      </div>
+      <div class="preview-card">
+        <div class="preview-label">Comprimida</div>
+        <div class="preview-img-wrap"><img id="prev-new" alt="comprimida"></div>
+        <div class="preview-meta" id="meta-new">—</div>
+        <div class="dim-info" id="dim-new"></div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls-card">
+      <div class="control-row">
+        <div class="control-label-row">
+          <span class="control-label">Qualidade</span>
+          <span class="control-value" id="quality-val">80%</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="quality-bar" style="width:80%"></div>
+        </div>
+        <input type="range" id="quality" min="5" max="99" value="80" step="1">
+      </div>
+
+      <div class="control-row">
+        <div class="control-label-row">
+          <span class="control-label">Escala</span>
+          <span class="control-value" id="scale-val">100%</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="scale-bar" style="width:100%"></div>
+        </div>
+        <input type="range" id="scale" min="10" max="100" value="100" step="5">
+      </div>
+
+      <div class="control-row">
+        <div class="control-label-row">
+          <span class="control-label">Formato de saída</span>
+        </div>
+        <div class="fmt-row">
+          <div class="fmt-btn active" data-fmt="image/jpeg">JPEG</div>
+          <div class="fmt-btn" data-fmt="image/png">PNG</div>
+          <div class="fmt-btn" data-fmt="image/webp">WebP</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div id="result-section">
+      <div class="result-card">
+        <div class="result-header">
+          <span class="result-title">Resultado</span>
+          <span class="badge-saving" id="saving-badge">–%</span>
+        </div>
+        <div class="result-body">
+          <div style="display:flex; align-items:center; gap: 1.5rem; flex:1;">
+            <div class="size-block">
+              <span class="size-label">Original</span>
+              <span class="size-value" id="r-orig-size">—</span>
+            </div>
+            <span class="size-arrow">→</span>
+            <div class="size-block">
+              <span class="size-label">Comprimida</span>
+              <span class="size-value" id="r-new-size" style="color: var(--accent);">—</span>
+            </div>
+          </div>
+          <button class="btn-download" id="btn-download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  let origFile = null;
+  let origImg = null;
+  let origBytes = 0;
+  let currentFmt = 'image/jpeg';
+  let currentDataUrl = null;
+  let debounceTimer = null;
+
+  const dropZone = document.getElementById('drop-zone');
+  const workspace = document.getElementById('workspace');
+  const resultSection = document.getElementById('result-section');
+  const fileInput = document.getElementById('file-input');
+
+  function fmtBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+    return (b / (1024 * 1024)).toFixed(2) + ' MB';
+  }
+
+  function getExt(fmt) {
+    return { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[fmt] || 'jpg';
+  }
+
+  function compress() {
+    if (!origImg) return;
+    const q = parseInt(document.getElementById('quality').value) / 100;
+    const s = parseInt(document.getElementById('scale').value) / 100;
+    const w = Math.round(origImg.naturalWidth * s);
+    const h = Math.round(origImg.naturalHeight * s);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(origImg, 0, 0, w, h);
+
+    currentDataUrl = canvas.toDataURL(currentFmt, q);
+
+    document.getElementById('prev-new').src = currentDataUrl;
+    document.getElementById('dim-new').textContent = w + ' × ' + h + ' px';
+
+    const base64 = currentDataUrl.split(',')[1];
+    const newBytes = Math.round(base64.length * 0.75);
+    const pct = origBytes > 0 ? Math.round((1 - newBytes / origBytes) * 100) : 0;
+
+    document.getElementById('meta-new').textContent = fmtBytes(newBytes);
+    document.getElementById('r-orig-size').textContent = fmtBytes(origBytes);
+    document.getElementById('r-new-size').textContent = fmtBytes(newBytes);
+
+    const badge = document.getElementById('saving-badge');
+    if (pct > 0) {
+      badge.textContent = '-' + pct + '%';
+      badge.className = 'badge-saving';
+    } else {
+      badge.textContent = '+' + Math.abs(pct) + '%';
+      badge.className = 'badge-saving negative';
+    }
+
+    resultSection.style.display = 'block';
+
+    document.getElementById('btn-download').onclick = () => {
+      const a = document.createElement('a');
+      const baseName = origFile ? origFile.name.replace(/\.[^.]+$/, '') : 'imagem';
+      a.download = baseName + '_comprimida.' + getExt(currentFmt);
+      a.href = currentDataUrl;
+      a.click();
+    };
+  }
+
+  function scheduleCompress() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(compress, 80);
+  }
+
+  function loadFile(file) {
+    if (!file || !file.type.match(/image\/(png|jpeg|jpg|webp)/)) return;
+    origFile = file;
+    origBytes = file.size;
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        origImg = img;
+        document.getElementById('prev-orig').src = e.target.result;
+        document.getElementById('meta-orig').textContent = fmtBytes(origBytes);
+        document.getElementById('dim-orig').textContent = img.naturalWidth + ' × ' + img.naturalHeight + ' px';
+        document.getElementById('file-name').textContent = file.name;
+
+        dropZone.style.display = 'none';
+        workspace.style.display = 'flex';
+        workspace.style.flexDirection = 'column';
+        workspace.style.gap = '1.25rem';
+
+        compress();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Drag & drop
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    loadFile(e.dataTransfer.files[0]);
+  });
+
+  fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
+
+  // Paste
+  document.addEventListener('paste', e => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.match(/image\//)) { loadFile(item.getAsFile()); break; }
+    }
+  });
+
+  // Sliders
+  const qualitySlider = document.getElementById('quality');
+  const scaleSlider = document.getElementById('scale');
+
+  qualitySlider.addEventListener('input', () => {
+    document.getElementById('quality-val').textContent = qualitySlider.value + '%';
+    document.getElementById('quality-bar').style.width = qualitySlider.value + '%';
+    scheduleCompress();
+  });
+
+  scaleSlider.addEventListener('input', () => {
+    document.getElementById('scale-val').textContent = scaleSlider.value + '%';
+    document.getElementById('scale-bar').style.width = scaleSlider.value + '%';
+    scheduleCompress();
+  });
+
+  // Format buttons
+  document.querySelectorAll('.fmt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.fmt-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFmt = btn.dataset.fmt;
+      scheduleCompress();
+    });
+  });
+
+  // Reset
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    origFile = null; origImg = null; origBytes = 0; currentDataUrl = null;
+    workspace.style.display = 'none';
+    resultSection.style.display = 'none';
+    dropZone.style.display = '';
+    fileInput.value = '';
+    qualitySlider.value = 80;
+    document.getElementById('quality-val').textContent = '80%';
+    document.getElementById('quality-bar').style.width = '80%';
+    scaleSlider.value = 100;
+    document.getElementById('scale-val').textContent = '100%';
+    document.getElementById('scale-bar').style.width = '100%';
+    document.querySelectorAll('.fmt-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.fmt-btn[data-fmt="image/jpeg"]').classList.add('active');
+    currentFmt = 'image/jpeg';
+  });
+</script>
+</body>
+</html>
